@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- KALEIDOPHONE FI-076 v0.2.0 build marker -->
+<!-- KALEIDOPHONE FI-076 v0.4.0 build marker -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -273,6 +273,12 @@ canvas.art{
 .cam-row{display:flex;flex-wrap:wrap;gap:8px}
 .cam-status{display:flex;align-items:center;gap:7px;margin-top:10px;font-family:var(--f-mono);font-size:12px;color:var(--ink-dim)}
 .cam-note{font-size:11px;line-height:1.6;color:var(--ink-faint);margin-top:8px}
+.rec-ind{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11px;color:var(--ink-dim)}
+.rec-dot{width:9px;height:9px;border-radius:50%;background:transparent}
+.rec-dot.live{background:var(--alert);box-shadow:0 0 8px var(--alert);animation:recPulse 1s ease-in-out infinite}
+.rec-time{min-width:34px}
+@keyframes recPulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){ .rec-dot.live{animation:none} }
 .pal-row{display:flex;flex-wrap:wrap;gap:6px}
 .pal{
   width:34px;height:26px;border-radius:4px;border:1px solid var(--od-shadow);
@@ -493,7 +499,7 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
       <div class="rl">Green Shoe Garage</div>
     </div>
     <div class="panel rivets side-plate ver"><span class="rv"></span>
-      <div class="nm" id="verPlate">KALEIDOPHONE v0.2.0</div>
+      <div class="nm" id="verPlate">KALEIDOPHONE v0.4.0</div>
       <div class="rl">Field Manual Release</div>
     </div>
   </aside>
@@ -534,6 +540,7 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
             <button class="chip cam" data-eng="scry" aria-pressed="false">Scrying Glass</button>
             <button class="chip cam" data-eng="seance" aria-pressed="false">S&eacute;ance</button>
             <button class="chip cam" data-eng="mirage" aria-pressed="false">Heat Mirage</button>
+            <button class="chip cam" data-eng="tint" aria-pressed="false">Hand-Tint</button>
           </div>
           <div class="grp-title" style="margin-top:12px">Palette</div>
           <div class="pal-row" id="artPalettes"></div>
@@ -550,6 +557,8 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
             <button class="btn small" id="artClear">Clear</button>
             <button class="btn small" id="artPlate" aria-pressed="true">Caption: On</button>
             <button class="btn small stop" id="artCapture">Capture PNG</button>
+            <button class="btn small" id="artRecord" aria-pressed="false">Record</button>
+            <span class="rec-ind"><span class="rec-dot" id="artRecDot"></span><span class="rec-time" id="artRecTime"></span></span>
           </div>
         </div>
 
@@ -559,9 +568,11 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
             <button class="btn small" id="camToggle" aria-pressed="false">Enable Camera</button>
             <button class="btn small" id="camFlip">To Back</button>
             <button class="btn small" id="camMirror" aria-pressed="true">Mirror: On</button>
+            <button class="btn small" id="camBackdrop">Backdrop: Off</button>
           </div>
+          <div class="art-slider" style="margin-top:10px"><label>Backdrop Mix</label><input type="range" id="camBlend" min="0" max="100" value="62" aria-label="Backdrop mix"><span class="rv" id="camBlendV">0.62</span></div>
           <div class="cam-status"><span class="dot" id="camDot"></span><span id="camStatus">Camera off</span></div>
-          <p class="cam-note">The camera feed stays on your device. Pick a Camera lens above and the live signal will warp the picture in real time.</p>
+          <p class="cam-note">The camera feed stays on your device. Pick a Camera lens above and the live signal will warp the picture in real time. Set a Backdrop to place a signal engine behind the camera.</p>
         </div>
       </div>
     </div>
@@ -872,10 +883,10 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
 <script>
 "use strict";
 /* ============================================================
-   KALEIDOPHONE FI-076 v0.2.0 - core engine
+   KALEIDOPHONE FI-076 v0.4.0 - core engine
    Modules: DBG, Store, DSP, MORSE, SimSource, RtlSource
    ============================================================ */
-const APP = { version:"0.2.0", release:"Camera Obscura" };
+const APP = { version:"0.4.0", release:"Kinetoscope" };
 
 /* ---------- themes (v0.4): single JS source of truth so the
    self-test harness can enforce WCAG AA on every pair ---------- */
@@ -967,7 +978,7 @@ const Store = {
         {freq:50110000, mode:"USB", label:"Repeater"}
       ],
       journal:[], journalArchive:[],
-      art:{ engine:"aurora", palette:"aurora", intensity:1.0, trails:0.85, flow:1.0, symmetry:6, plate:true, mirror:true, facing:"user" }
+      art:{ engine:"aurora", palette:"aurora", intensity:1.0, trails:0.85, flow:1.0, symmetry:6, plate:true, mirror:true, facing:"user", backdrop:"none", blend:0.62 }
     };
   },
   load(){
@@ -2170,7 +2181,7 @@ const UI={
       try{ await navigator.clipboard.writeText(fbReport()); $("fbCopy").textContent="Copied"; setTimeout(()=>$("fbCopy").textContent="Copy Report",1500); }
       catch(e){ alert(fbReport()); }
     };
-    $("btnHelp").onclick=()=>alert("KALEIDOPHONE quick start:\n1. Click SIMULATOR in the top rail to start a live signal with no hardware (or CONNECT USB with an RTL-SDR in Chrome/Edge).\n2. Watch the Studio canvas paint. Pick an engine and palette, then shape it with Intensity, Persistence, Flow, and Symmetry.\n3. Try a Camera lens (Scrying Glass, Seance, Heat Mirage): enable the camera and the live signal warps the video in real time. The feed stays on your device.\n4. Capture PNG saves the frame with a caption plate stamping the frequency and moment that made it.\n5. Want to listen or retune? The Receiver page has the full radio: volume, tuning, bands, and decoders. The art keeps painting whatever it hears.");
+    $("btnHelp").onclick=()=>alert("KALEIDOPHONE quick start:\n1. Click SIMULATOR in the top rail to start a live signal with no hardware (or CONNECT USB with an RTL-SDR in Chrome/Edge).\n2. Watch the Studio canvas paint. Pick an engine and palette, then shape it with Intensity, Persistence, Flow, and Symmetry.\n3. Try a Camera lens (Scrying Glass, Seance, Heat Mirage, Hand-Tint): enable the camera and the live signal warps the video in real time. Set a Backdrop to stand in front of a signal engine. The feed stays on your device.\n4. Capture PNG saves the frame with a caption plate stamping the frequency and moment that made it. Record saves a short clip of the canvas as a video file.\n5. Want to listen or retune? The Receiver page has the full radio: volume, tuning, bands, and decoders. The art keeps painting whatever it hears.");
 
     /* header knobs */
     $("agcKnob").oninput=e=>{ S.agc=+e.target.value; $("agcVal").textContent=["Off","Slow","Medium","Fast"][S.agc]; Store.save(); };
@@ -3121,19 +3132,37 @@ const UI={
       return r>0.95 || "got "+r.toFixed(3);
     });
     T("Studio: every engine key resolves to a render method",()=>{
-      const map={aurora:"eAurora",mandala:"eMandala",phosphor:"ePhosphor",strata:"eStrata",cymatics:"eCymatics",scry:"eScry",seance:"eSeance",mirage:"eMirage"};
+      const map={aurora:"eAurora",mandala:"eMandala",phosphor:"ePhosphor",strata:"eStrata",cymatics:"eCymatics",scry:"eScry",seance:"eSeance",mirage:"eMirage",tint:"eHandTint"};
       for(const k in map) if(typeof ART[map[k]]!=="function") return "missing "+map[k];
       return true;
     });
+    T("Backdrop: every option maps to a signal engine and paintBackdrop exists",()=>{
+      if(typeof ART.paintBackdrop!=="function") return "missing paintBackdrop";
+      const sig={aurora:"eAurora",mandala:"eMandala",phosphor:"ePhosphor",strata:"eStrata",cymatics:"eCymatics"};
+      for(const b of ART.BACKDROPS){ if(b==="none") continue; if(typeof ART[sig[b]]!=="function") return "backdrop "+b+" has no engine"; if(!(b in ART.BACKDROP_NAMES)) return "no label for "+b; }
+      return true;
+    });
     T("Camera: plumbing present and lenses degrade without a feed",()=>{
-      for(const m of ["startCam","stopCam","flipCam","paintCam","updateCamUI","isCam"]) if(typeof ART[m]!=="function") return "missing "+m;
+      for(const m of ["startCam","stopCam","flipCam","paintCam","updateCamUI","isCam","paintBackdrop"]) if(typeof ART[m]!=="function") return "missing "+m;
       if(ART.paintCam()!==false) return "paintCam should be false with no camera";
-      const savedCam=ART.cam, savedCtx=ART.ctx, calls=[];
-      const stubG=new Proxy({},{get:(t,p)=>{ if(p==="createLinearGradient") return ()=>({addColorStop(){}}); if(p==="canvas") return {width:ART.W,height:ART.H}; return ()=>{ calls.push(p); }; }});
-      ART.cam=null; ART.ctx=stubG;
-      try{ ART.eScry(stubG); ART.eSeance(stubG); ART.eMirage(stubG); }
-      catch(e){ ART.cam=savedCam; ART.ctx=savedCtx; return "threw: "+e.message; }
-      ART.cam=savedCam; ART.ctx=savedCtx;
+      const savedCam=ART.cam, savedCtx=ART.ctx, savedBlend=ART.blending;
+      const stubG=new Proxy({},{get:(t,p)=>{ if(p==="createLinearGradient") return ()=>({addColorStop(){}}); if(p==="getImageData"||p==="createImageData") return (w,h)=>({data:new Uint8ClampedArray(Math.max(1,(w|0))*Math.max(1,(h|0))*4)}); if(p==="canvas") return {width:ART.W,height:ART.H}; return ()=>{}; },set:()=>true});
+      ART.cam=null; ART.ctx=stubG; ART.blending=false;
+      try{ ART.eScry(stubG); ART.eSeance(stubG); ART.eMirage(stubG); ART.eHandTint(stubG); ART.blending=true; ART.eScry(stubG); }
+      catch(e){ ART.cam=savedCam; ART.ctx=savedCtx; ART.blending=savedBlend; return "threw: "+e.message; }
+      ART.cam=savedCam; ART.ctx=savedCtx; ART.blending=savedBlend;
+      return true;
+    });
+    T("Recording: plumbing present and degrades when unsupported",()=>{
+      for(const m of ["startRec","stopRec","finishRec","updateRecUI","recSupported"]) if(typeof ART[m]!=="function") return "missing "+m;
+      const savedRec=ART.rec, savedCv=ART.cv;
+      ART.cv={};  /* no captureStream, so recSupported is false */
+      let threw=false;
+      try{ ART.startRec(); }catch(e){ threw=true; }
+      const started=!!(ART.rec&&ART.rec.on);
+      ART.rec=savedRec; ART.cv=savedCv;
+      if(threw) return "startRec threw when unsupported";
+      if(started) return "startRec should not begin when unsupported";
       return true;
     });
     const allOk=out.every(o=>o[1]);
@@ -3145,7 +3174,7 @@ const UI={
 };
 
 /* ============================================================
-   ART - Signal Studio (v0.2.0)
+   ART - Signal Studio (v0.4.0)
    Turns the live spectrum and raw IQ into generative paintings.
    Reads RX.specAvg (per-bin dB, DC-centered) and RX.iqRing.
    Non-destructive: the receiver, audio, and decoders run as before.
@@ -3156,8 +3185,12 @@ const ART = {
   engine:"aurora", palette:"aurora",
   intensity:1.0, trails:0.85, flow:1.0, symmetry:6, plate:true, frozen:false,
   mirror:true, facing:"user", cam:null, camc:null, camx:null,
+  tintc:null, tintx:null, backdrop:"none", blend:0.62, blending:false,
+  rec:null, MAXREC:60,
   t:0, luts:{}, grid:null, gctx:null,
-  CAM_ENGINES:["scry","seance","mirage"],
+  CAM_ENGINES:["scry","seance","mirage","tint"],
+  BACKDROPS:["none","aurora","mandala","phosphor","strata","cymatics"],
+  BACKDROP_NAMES:{none:"Off",aurora:"Aurora",mandala:"Bloom",phosphor:"Phosphor",strata:"Strata",cymatics:"Cymatic"},
   isCam(e){ return this.CAM_ENGINES.indexOf(e)>=0; },
 
   /* palettes as gradient stops [pos, r,g,b] */
@@ -3196,13 +3229,14 @@ const ART = {
     this.camc=document.createElement("canvas"); this.camc.width=16; this.camc.height=16;
     this.camx=this.camc.getContext("2d");
     this.cam={on:false,stream:null,video:null,ready:false};
-    const a=Object.assign({engine:"aurora",palette:"aurora",intensity:1,trails:0.85,flow:1,symmetry:6,plate:true,mirror:true,facing:"user"}, S.art||{});
+    const a=Object.assign({engine:"aurora",palette:"aurora",intensity:1,trails:0.85,flow:1,symmetry:6,plate:true,mirror:true,facing:"user",backdrop:"none",blend:0.62}, S.art||{});
     this.engine=a.engine; this.palette=a.palette; this.intensity=a.intensity;
     this.trails=a.trails; this.flow=a.flow; this.symmetry=a.symmetry; this.plate=a.plate;
-    this.mirror=a.mirror!==false; this.facing=a.facing||"user";
+    this.mirror=a.mirror!==false; this.facing=a.facing||"user"; this.backdrop=a.backdrop||"none";
+    this.blend=(typeof a.blend==="number")?a.blend:0.62;
     this.buildPalettes(); this.wire(); this.syncUI(); this.resize();
   },
-  save(){ S.art={engine:this.engine,palette:this.palette,intensity:this.intensity,trails:this.trails,flow:this.flow,symmetry:this.symmetry,plate:this.plate,mirror:this.mirror,facing:this.facing}; Store.save(); },
+  save(){ S.art={engine:this.engine,palette:this.palette,intensity:this.intensity,trails:this.trails,flow:this.flow,symmetry:this.symmetry,plate:this.plate,mirror:this.mirror,facing:this.facing,backdrop:this.backdrop,blend:this.blend}; Store.save(); },
 
   buildPalettes(){
     const host=$("artPalettes"); if(!host) return; host.innerHTML="";
@@ -3230,14 +3264,17 @@ const ART = {
     sl("artTrails","artTrailsV",v=>this.trails=v/100,()=>this.trails.toFixed(2));
     sl("artFlow","artFlowV",v=>this.flow=v/100,()=>this.flow.toFixed(2));
     sl("artSym","artSymV",v=>this.symmetry=v,()=>String(this.symmetry));
+    sl("camBlend","camBlendV",v=>this.blend=v/100,()=>this.blend.toFixed(2));
     $("artFreeze").onclick=()=>{ this.frozen=!this.frozen; $("artFreeze").classList.toggle("active",this.frozen); $("artFreeze").textContent=this.frozen?"Resume":"Freeze"; };
     $("artClear").onclick=()=>this.clear();
     $("artPlate").onclick=()=>{ this.plate=!this.plate; $("artPlate").setAttribute("aria-pressed",String(this.plate)); $("artPlate").textContent="Caption: "+(this.plate?"On":"Off"); this.save(); };
     $("artCapture").onclick=()=>this.capture();
+    const rb=$("artRecord"); if(rb) rb.onclick=()=>{ (this.rec&&this.rec.on)?this.stopRec():this.startRec(); };
     $("artAudio").onclick=()=>{ $("btnMute").click(); };
     const ct=$("camToggle"); if(ct) ct.onclick=()=>{ (this.cam&&this.cam.on)?this.stopCam():this.startCam(); };
     const cf=$("camFlip"); if(cf) cf.onclick=()=>this.flipCam();
     const cm=$("camMirror"); if(cm) cm.onclick=()=>{ this.mirror=!this.mirror; this.save(); this.updateCamUI(); };
+    const cb=$("camBackdrop"); if(cb) cb.onclick=()=>{ const o=this.BACKDROPS, i=(o.indexOf(this.backdrop)+1)%o.length; this.backdrop=o[i]; this.save(); this.updateCamUI(); this.clear(); };
     this.updateCamUI();
   },
   syncUI(){
@@ -3249,7 +3286,8 @@ const ART = {
     $("artFlow").value=Math.round(this.flow*100); $("artFlowV").textContent=this.flow.toFixed(2);
     $("artSym").value=this.symmetry; $("artSymV").textContent=String(this.symmetry);
     $("artPlate").setAttribute("aria-pressed",String(this.plate)); $("artPlate").textContent="Caption: "+(this.plate?"On":"Off");
-    this.syncPalettes();
+    const cbl=$("camBlend"); if(cbl) cbl.value=Math.round(this.blend*100); const cblv=$("camBlendV"); if(cblv) cblv.textContent=this.blend.toFixed(2);
+    this.syncPalettes(); this.updateRecUI();
   },
 
   resize(){
@@ -3288,6 +3326,11 @@ const ART = {
     if(this.frozen) return;
     this.sample(); this.t+=0.016*this.flow;
     const g=this.ctx;
+    this.blending=false;
+    if(camEng && camLive && this.backdrop!=="none"){
+      this.paintBackdrop(g);   /* signal art painted first */
+      this.blending=true;      /* camera lens then composites over it */
+    }
     switch(this.engine){
       case "mandala":  this.eMandala(g); break;
       case "phosphor": this.ePhosphor(g); break;
@@ -3296,8 +3339,10 @@ const ART = {
       case "scry":     this.eScry(g); break;
       case "seance":   this.eSeance(g); break;
       case "mirage":   this.eMirage(g); break;
+      case "tint":     this.eHandTint(g); break;
       default:         this.eAurora(g);
     }
+    this.blending=false;
     if(RX.src){
       $("artFreq").textContent=UI.fmtFreq(RX.freq);
       $("artMode").textContent=RX.mode;
@@ -3461,39 +3506,40 @@ const ART = {
     const d=$("camDot"); if(d) d.className="dot"+(on?" on":((this.cam&&this.cam.error)?" warn":""));
     const s=$("camStatus"); if(s) s.textContent=on?((this.facing==="user")?"Live \u00b7 front":"Live \u00b7 back"):((this.cam&&this.cam.error)?this.cam.error:"Camera off");
     const cf=$("camFlip"); if(cf) cf.textContent=(this.facing==="user")?"To Back":"To Front";
+    const cbk=$("camBackdrop"); if(cbk) cbk.textContent="Backdrop: "+this.BACKDROP_NAMES[this.backdrop];
   },
 
   /* ---- lens: scrying glass (camera kaleidoscope) ---- */
   eScry(g){
     if(!this.paintCam()){ this.camHint(g); return; }
     const W=this.W,H=this.H, sym=Math.max(2,this.symmetry|0), e=this.energy();
-    this.fade(g, 0.10+0.5*(1-this.trails));
-    const R=Math.hypot(W,H), zoom=0.85+0.35*Math.sin(this.t*0.25)+e*0.7, wedge=Math.PI/sym;
+    if(!this.blending) this.fade(g, 0.10+0.5*(1-this.trails));
+    const R=Math.hypot(W,H), zoom=0.85+0.35*Math.sin(this.t*0.25)+e*0.7, wedge=Math.PI/sym, a=this.blending?this.blend:1;
     g.save(); g.translate(W/2,H/2); g.rotate(this.t*0.12+e*1.5);
     g.filter="saturate("+(1.25+e*1.4).toFixed(2)+") hue-rotate("+(((this.t*26+e*160)|0)%360)+"deg)";
     for(let k=0;k<sym;k++){
       g.save(); g.rotate(k*2*wedge);
       g.beginPath(); g.moveTo(0,0); g.arc(0,0,R,-wedge,wedge); g.closePath(); g.clip();
       if(k%2) g.scale(1,-1);
-      g.globalAlpha=1; g.drawImage(this.camc, -W*zoom/2, -H*zoom/2, W*zoom, H*zoom);
+      g.globalAlpha=a; g.drawImage(this.camc, -W*zoom/2, -H*zoom/2, W*zoom, H*zoom);
       g.restore();
     }
-    g.restore(); g.filter="none";
+    g.restore(); g.filter="none"; g.globalAlpha=1;
   },
 
   /* ---- lens: seance (signal-widened chromatic ghost) ---- */
   eSeance(g){
     if(!this.paintCam()){ this.camHint(g); return; }
     const W=this.W,H=this.H, e=this.energy(), p=this.maxPeak();
-    this.fade(g, 0.12+0.5*(1-this.trails));
-    const dx=3+e*46+p*22, dy=(e*12)|0;
+    if(!this.blending) this.fade(g, 0.12+0.5*(1-this.trails));
+    const dx=3+e*46+p*22, dy=(e*12)|0, base=this.blending?this.blend:1;
     g.globalCompositeOperation="lighter";
     g.filter="hue-rotate("+(((this.t*40)|0)%360)+"deg) saturate(1.7)";
-    g.globalAlpha=0.85; g.drawImage(this.camc, dx, 0, W, H);
+    g.globalAlpha=0.85*base; g.drawImage(this.camc, dx, 0, W, H);
     g.filter="hue-rotate("+(((180+this.t*40)|0)%360)+"deg) saturate(1.7)";
     g.drawImage(this.camc, -dx, 0, W, H);
     g.filter="hue-rotate("+(((90+this.t*24)|0)%360)+"deg)";
-    g.globalAlpha=0.5; g.drawImage(this.camc, 0, dy, W, H);
+    g.globalAlpha=0.5*base; g.drawImage(this.camc, 0, dy, W, H);
     g.filter="none"; g.globalAlpha=1; g.globalCompositeOperation="source-over";
   },
 
@@ -3501,8 +3547,8 @@ const ART = {
   eMirage(g){
     if(!this.paintCam()){ this.camHint(g); return; }
     const W=this.W,H=this.H, bands=72, bh=H/bands, amp=this.intensity;
-    this.fade(g, 0.08+0.4*(1-this.trails));
-    g.globalAlpha=1;
+    if(!this.blending) this.fade(g, 0.08+0.4*(1-this.trails));
+    g.globalAlpha=this.blending?this.blend:1;
     for(let b=0;b<bands;b++){
       const sy=b*bh, si=Math.min(this.WORK-1,(b/bands*this.WORK)|0), v=this.smooth[si]||0;
       let off=Math.sin(this.t*2.2+b*0.35)*(v*amp*W*0.14)+(v-0.5)*W*0.05;
@@ -3511,11 +3557,104 @@ const ART = {
       if(off>0.5) g.drawImage(this.camc, W-off, sy, off, bh, 0, sy, off, bh);
       else if(off<-0.5) g.drawImage(this.camc, 0, sy, -off, bh, W+off, sy, -off, bh);
     }
+    g.globalAlpha=1;
     g.globalCompositeOperation="overlay";
     const grd=g.createLinearGradient(0,0,W,H);
     grd.addColorStop(0,this.col(this.palette,0.25)); grd.addColorStop(1,this.col(this.palette,0.85));
     g.globalAlpha=0.22+0.4*this.energy(); g.fillStyle=grd; g.fillRect(0,0,W,H);
     g.globalAlpha=1; g.globalCompositeOperation="source-over";
+  },
+
+  /* ---- lens: hand-tinted (camera luminance mapped through the palette) ---- */
+  eHandTint(g){
+    if(!this.paintCam()){ this.camHint(g); return; }
+    const W=this.W,H=this.H;
+    const bw=Math.min(360,W), bh=Math.max(1,Math.round(bw*H/W));
+    if(!this.tintc){ this.tintc=document.createElement("canvas"); this.tintx=this.tintc.getContext("2d",{willReadFrequently:true}); }
+    const buf=this.tintc, bx=this.tintx;
+    if(buf.width!==bw||buf.height!==bh){ buf.width=bw; buf.height=bh; }
+    bx.drawImage(this.camc,0,0,bw,bh);
+    const img=bx.getImageData(0,0,bw,bh), d=img.data, lut=this.lut(this.palette);
+    const e=this.energy(), contrast=1+e*1.6, gamma=0.55+(1-Math.min(1,e*1.8))*0.85, drift=((this.t*3+e*90)|0)%256;
+    for(let i=0;i<d.length;i+=4){
+      let l=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;
+      l=Math.min(1,Math.max(0,(l-0.5)*contrast+0.5));
+      l=Math.pow(l,gamma);
+      const k=((((l*255)|0)+drift)&255)*3;
+      d[i]=lut[k]; d[i+1]=lut[k+1]; d[i+2]=lut[k+2];
+    }
+    bx.putImageData(img,0,0);
+    if(!this.blending) this.fade(g, 0.06+0.3*(1-this.trails));
+    g.imageSmoothingEnabled=true; g.globalAlpha=this.blending?this.blend:1;
+    g.drawImage(buf,0,0,W,H); g.globalAlpha=1;
+  },
+
+  /* paint a signal engine behind a camera lens */
+  paintBackdrop(g){
+    switch(this.backdrop){
+      case "mandala":  this.eMandala(g); break;
+      case "phosphor": this.ePhosphor(g); break;
+      case "strata":   this.eStrata(g); break;
+      case "cymatics": this.eCymatics(g); break;
+      case "aurora":   this.eAurora(g); break;
+    }
+  },
+
+  /* ---- clip recording (canvas capture to a webm file) ---- */
+  recSupported(){ return !!(this.cv && this.cv.captureStream && typeof MediaRecorder!=="undefined"); },
+  startRec(){
+    if(this.rec&&this.rec.on) return;
+    if(!this.recSupported()){ this.rec={on:false,error:"Recording not supported here"}; this.updateRecUI(); return; }
+    let stream, recorder;
+    try{
+      stream=this.cv.captureStream(30);
+      const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];
+      let mime=""; for(const t of types){ if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)){ mime=t; break; } }
+      recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);
+      this.rec={on:true,recorder,stream,chunks:[],mime:recorder.mimeType||mime||"video/webm",t0:(performance&&performance.now)?performance.now():Date.now(),timer:null,error:null};
+      recorder.ondataavailable=e=>{ if(e.data&&e.data.size) this.rec.chunks.push(e.data); };
+      recorder.onstop=()=>this.finishRec();
+      recorder.start(120);
+      this.rec.timer=setInterval(()=>{
+        const s=(((performance&&performance.now)?performance.now():Date.now())-this.rec.t0)/1000;
+        const rt=$("artRecTime"); if(rt) rt.textContent=s<60?(s.toFixed(1)+"s"):(Math.floor(s/60)+"m"+String(Math.floor(s%60)).padStart(2,"0"));
+        if(s>=this.MAXREC) this.stopRec();
+      },200);
+      this.updateRecUI();
+    }catch(err){ this.rec={on:false,error:"Recording failed to start"}; if(stream){ try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} } this.updateRecUI(); }
+  },
+  stopRec(){
+    const r=this.rec; if(!r||!r.on) return;
+    if(r.timer){ clearInterval(r.timer); r.timer=null; }
+    try{ r.recorder.stop(); }catch(e){ this.finishRec(); }
+  },
+  finishRec(){
+    const r=this.rec; if(!r) return;
+    if(r.stream){ try{ r.stream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+    const chunks=r.chunks||[];
+    r.on=false;
+    if(chunks.length){
+      const blob=new Blob(chunks,{type:r.mime||"video/webm"});
+      const ext=(r.mime&&r.mime.indexOf("mp4")>=0)?"mp4":"webm";
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download="kaleidophone-clip-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+"."+ext;
+      a.click();
+      setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(e){} },4000);
+    }
+    this.updateRecUI();
+  },
+  updateRecUI(){
+    const on=!!(this.rec&&this.rec.on), b=$("artRecord");
+    if(b){
+      b.textContent=on?"Stop":"Record";
+      b.classList.toggle("active",on);
+      b.setAttribute("aria-pressed",String(on));
+      if(!this.recSupported()){ b.disabled=true; b.title="Recording needs a browser with MediaRecorder and canvas capture"; }
+      else b.title=on?"Stop recording and save the clip":"Record a clip of the canvas (up to "+this.MAXREC+"s)";
+    }
+    const d=$("artRecDot"); if(d) d.className="rec-dot"+(on?" live":"");
+    const rt=$("artRecTime"); if(rt&&!on) rt.textContent=(this.rec&&this.rec.error)?this.rec.error:"";
   },
 
   /* export the current frame, optionally stamped with a caption plate */
