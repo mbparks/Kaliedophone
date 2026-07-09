@@ -50,7 +50,11 @@ Six hand-tinted ramps: Aurora, Melies, Marbling, Orrery, Ember, and a full Spect
 
 Capture PNG exports the canvas. With Caption on, it stamps a small plate carrying the instrument name, the tuned frequency and mode, the palette, the engine, and a UTC timestamp, so each image is tied to the exact moment of radio that made it.
 
-Record captures a short clip of the canvas to a video file. Press it to start, press again to stop, and the clip downloads. Recording stops on its own after a minute so the files stay small. The clip is video only, and it captures whatever is on the canvas, including camera lenses and backdrops.
+Record captures a short clip of the canvas to a video file. Press it to start, press again to stop, and the clip downloads. Recording stops on its own after a minute so the files stay small. When the receiver is producing sound, that audio is mixed into the clip. The clip captures whatever is on the canvas, including camera lenses and backdrops.
+
+### Gallery
+
+Recent captures and clips gather in a Gallery strip below the canvas. Each thumbnail can be saved again or removed, and clips can be opened for playback. The Gallery holds the most recent items for the session and clears on reload.
 
 ---
 
@@ -106,6 +110,8 @@ State (engine, palette, control positions, camera preferences, receiver settings
 
 Everything runs on the device. The camera feed, the audio, and the signal are processed in the page and are not transmitted. Clearing the browser's site data resets saved settings.
 
+Settings can be moved between machines. The System page has Export Settings, which downloads everything the instrument remembers (Studio, camera, and receiver settings) as a JSON file, and Import Settings, which restores from that file. Importing replaces the current settings and reloads the page.
+
 ---
 
 ## Development standards
@@ -131,7 +137,8 @@ Run the self-test from the System page before shipping. It covers palette lookup
 - Camera lenses at a large canvas size can be demanding on low-end mobile GPUs. If the frame rate drops, shrink the window or switch to a signal engine.
 - Live RTL-SDR needs WebUSB, so live hardware capture is limited to Chrome and Edge. Other browsers use the Simulator or IQ replay.
 - Settings persist in the browser via local storage. A portable settings export and import file is not yet wired into the Studio.
-- Clip recording uses the browser's MediaRecorder and canvas capture, which most current browsers support. The output is WebM where available and MP4 on some browsers. Recording is video only, with no audio, and stops after a minute.
+- Clip recording uses the browser's MediaRecorder and canvas capture, which most current browsers support. The output is WebM where available and MP4 on some browsers. The receiver's audio is included when it is producing sound. Recording stops after a minute.
+- The Gallery holds recent captures and clips for the session only. It clears on reload, and importing settings reloads the page.
 - The receiver's decoders and DSP are inherited and functional, but the focus of this instrument is the art. Expect the radio to be capable rather than exhaustive.
 - No backwards compatibility is promised between versions.
 
@@ -139,9 +146,9 @@ Run the self-test from the System page before shipping. It covers palette lookup
 
 ## Roadmap
 
-- A portable export and import for art settings.
-- Optional audio in the recorded clip, taken from the receiver.
-- A small gallery of recent captures and clips inside the Studio.
+- Persist the Gallery across sessions, so captures and clips survive a reload.
+- A looping GIF export for clips, alongside the video file.
+- Adjustable recording length and frame rate.
 
 ---
 

@@ -2,6 +2,23 @@
 
 All notable changes to KALEIDOPHONE (Field Instrument 076). This project does not promise backwards compatibility between versions.
 
+## v0.5.0 - Cinematheque
+
+Added audio to recordings, portable settings, and an in-Studio gallery.
+
+### Added
+
+- **Audio in clips.** The receiver's audio is tapped from the audio graph and mixed into recorded clips when sound is playing. The clip indicator shows a note symbol when audio is present. The tap works with both the AudioWorklet and ScriptProcessor sinks.
+- **Settings export and import.** The System page can export everything the instrument remembers (Studio, camera, and receiver settings) to a JSON file, and import a file to restore it. Importing replaces the current settings and reloads.
+- **Gallery.** A strip below the canvas collects recent captures and clips for the session. Each item can be saved again or removed, and clips can be opened for playback. Holds the most recent twelve, newest first, and evicts and frees older ones.
+- New self-tests: the gallery adds and evicts correctly, settings serialize and round-trip, and the audio tap is safe when the audio graph is absent.
+
+### Changed
+
+- Capture and clip filenames now use the kaleidophone prefix.
+- Quick-start help mentions audio, the gallery, and settings.
+- Version bumped to 0.5.0. Release name Cinematheque.
+
 ## v0.4.0 - Kinetoscope
 
 Added a Backdrop Mix control and clip recording.

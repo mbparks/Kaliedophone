@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- KALEIDOPHONE FI-076 v0.4.0 build marker -->
+<!-- KALEIDOPHONE FI-076 v0.5.0 build marker -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -279,6 +279,16 @@ canvas.art{
 .rec-time{min-width:34px}
 @keyframes recPulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media (prefers-reduced-motion: reduce){ .rec-dot.live{animation:none} }
+.gal-row{display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px 12px;min-height:24px}
+.gal-empty{font-size:11.5px;color:var(--ink-faint);letter-spacing:.02em;padding:2px 2px 6px}
+.gal-cell{position:relative;width:96px;height:64px;border-radius:8px;overflow:hidden;border:1px solid color-mix(in srgb, var(--od-edge) 45%, transparent);background:var(--scope-bg);box-shadow:0 2px 8px rgba(8,4,26,.4)}
+.gal-thumb{width:100%;height:100%;object-fit:cover;display:block}
+.gal-badge{position:absolute;left:5px;bottom:4px;font-family:var(--f-mono);font-size:8.5px;letter-spacing:.06em;color:#f6edd8;background:rgba(12,8,26,.72);padding:1px 5px;border-radius:999px}
+.gal-act{position:absolute;top:3px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(12,8,26,.72);color:#f6edd8;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+.gal-act:hover{background:var(--amber);color:#2a1f08}
+.gal-cell .gal-act[title="Save again"]{right:24px}
+.gal-del{right:3px}
+.gal-del:hover{background:var(--alert);color:#2a0518}
 .pal-row{display:flex;flex-wrap:wrap;gap:6px}
 .pal{
   width:34px;height:26px;border-radius:4px;border:1px solid var(--od-shadow);
@@ -499,7 +509,7 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
       <div class="rl">Green Shoe Garage</div>
     </div>
     <div class="panel rivets side-plate ver"><span class="rv"></span>
-      <div class="nm" id="verPlate">KALEIDOPHONE v0.4.0</div>
+      <div class="nm" id="verPlate">KALEIDOPHONE v0.5.0</div>
       <div class="rl">Field Manual Release</div>
     </div>
   </aside>
@@ -574,6 +584,11 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
           <div class="cam-status"><span class="dot" id="camDot"></span><span id="camStatus">Camera off</span></div>
           <p class="cam-note">The camera feed stays on your device. Pick a Camera lens above and the live signal will warp the picture in real time. Set a Backdrop to place a signal engine behind the camera.</p>
         </div>
+      </div>
+
+      <div class="panel rivets" style="margin-top:2px"><span class="rv"></span>
+        <div class="panel-title">Gallery <span class="tr">Recent captures and clips, this session</span></div>
+        <div class="gal-row" id="artGallery"></div>
       </div>
     </div>
 
@@ -787,6 +802,14 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
         <p>Browser-runnable test harness. All lamps must be green before a release ships.</p>
         <button class="btn" id="btnSelfTest">Run Self Test</button>
         <div class="well" style="padding:10px;margin-top:8px" id="testOut"><div class="testline">Not yet run.</div></div>
+        <h3>Settings</h3>
+        <p>Export everything this instrument remembers (Studio, camera, and receiver settings) to a portable file, or import a file to restore it. Importing replaces your current settings and reloads.</p>
+        <div class="cam-row">
+          <button class="btn" id="setExport">Export Settings</button>
+          <button class="btn" id="setImportBtn">Import Settings</button>
+          <input type="file" id="setImportFile" accept="application/json,.json" style="display:none">
+        </div>
+        <div class="well" style="padding:10px;margin-top:8px"><div class="testline" id="setStatus">Settings live in this browser until you export them.</div></div>
         <h3>Commissioning</h3>
         <p>First hardware session, SHAKEDOWN style. Run the steps in order with a dongle connected and a known reference on the air (WWV on 10.000.000, a local NOAA transmitter, or a signal generator). The simulator works as a dry run and results are marked as such.</p>
         <div class="well" style="padding:10px;margin-bottom:8px"><div class="testline" id="cxStatus">Not commissioned.</div></div>
@@ -883,10 +906,10 @@ table.plain th{font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color
 <script>
 "use strict";
 /* ============================================================
-   KALEIDOPHONE FI-076 v0.4.0 - core engine
+   KALEIDOPHONE FI-076 v0.5.0 - core engine
    Modules: DBG, Store, DSP, MORSE, SimSource, RtlSource
    ============================================================ */
-const APP = { version:"0.4.0", release:"Kinetoscope" };
+const APP = { version:"0.5.0", release:"Cinematheque" };
 
 /* ---------- themes (v0.4): single JS source of truth so the
    self-test harness can enforce WCAG AA on every pair ---------- */
@@ -2181,7 +2204,7 @@ const UI={
       try{ await navigator.clipboard.writeText(fbReport()); $("fbCopy").textContent="Copied"; setTimeout(()=>$("fbCopy").textContent="Copy Report",1500); }
       catch(e){ alert(fbReport()); }
     };
-    $("btnHelp").onclick=()=>alert("KALEIDOPHONE quick start:\n1. Click SIMULATOR in the top rail to start a live signal with no hardware (or CONNECT USB with an RTL-SDR in Chrome/Edge).\n2. Watch the Studio canvas paint. Pick an engine and palette, then shape it with Intensity, Persistence, Flow, and Symmetry.\n3. Try a Camera lens (Scrying Glass, Seance, Heat Mirage, Hand-Tint): enable the camera and the live signal warps the video in real time. Set a Backdrop to stand in front of a signal engine. The feed stays on your device.\n4. Capture PNG saves the frame with a caption plate stamping the frequency and moment that made it. Record saves a short clip of the canvas as a video file.\n5. Want to listen or retune? The Receiver page has the full radio: volume, tuning, bands, and decoders. The art keeps painting whatever it hears.");
+    $("btnHelp").onclick=()=>alert("KALEIDOPHONE quick start:\n1. Click SIMULATOR in the top rail to start a live signal with no hardware (or CONNECT USB with an RTL-SDR in Chrome/Edge).\n2. Watch the Studio canvas paint. Pick an engine and palette, then shape it with Intensity, Persistence, Flow, and Symmetry.\n3. Try a Camera lens (Scrying Glass, Seance, Heat Mirage, Hand-Tint): enable the camera and the live signal warps the video in real time. Set a Backdrop to stand in front of a signal engine. The feed stays on your device.\n4. Capture PNG saves the frame with a caption plate stamping the frequency and moment that made it. Record saves a short clip of the canvas, with the receiver's audio mixed in. Recent captures and clips gather in the Gallery below the canvas.\n5. Export or import all your settings from the System page.\n6. Want to listen or retune? The Receiver page has the full radio: volume, tuning, bands, and decoders. The art keeps painting whatever it hears.");
 
     /* header knobs */
     $("agcKnob").oninput=e=>{ S.agc=+e.target.value; $("agcVal").textContent=["Off","Slow","Medium","Fast"][S.agc]; Store.save(); };
@@ -3165,6 +3188,27 @@ const UI={
       if(started) return "startRec should not begin when unsupported";
       return true;
     });
+    T("Gallery: adds items and evicts past the cap",()=>{
+      for(const m of ["addToGallery","renderGallery","gallerySave","galleryRemove"]) if(typeof ART[m]!=="function") return "missing "+m;
+      const saved=ART.gallery; ART.gallery=[];
+      for(let i=0;i<ART.GALLERY_MAX+4;i++) ART.addToGallery({type:"png",url:"data:,",name:"x"+i,thumb:"data:,",ts:i});
+      const len=ART.gallery.length, newestFirst=ART.gallery[0].name==="x"+(ART.GALLERY_MAX+3);
+      ART.gallery=saved; ART.renderGallery();
+      if(len!==ART.GALLERY_MAX) return "cap not enforced: "+len;
+      return newestFirst || "order wrong";
+    });
+    T("Settings: export serializes state and import rejects non-objects",()=>{
+      if(typeof ART.exportSettings!=="function"||typeof ART.importSettings!=="function") return "missing settings methods";
+      let json; try{ json=JSON.stringify(S); }catch(e){ return "state not serializable"; }
+      const round=JSON.parse(json);
+      if(!round||typeof round!=="object") return "round trip failed";
+      return true;
+    });
+    T("Recording: audio tap is optional and safe when the graph is absent",()=>{
+      if(typeof ART.audioTrackForRec!=="function") return "missing audioTrackForRec";
+      const r=ART.audioTrackForRec();
+      return (r===null||typeof r==="object") || "unexpected return";
+    });
     const allOk=out.every(o=>o[1]);
     $("testOut").innerHTML=out.map(o=>
       "<div class='testline'><span class='"+(o[1]?"ok":"fail")+"'>"+(o[1]?"&#10004; PASS":"&#10008; FAIL")+"</span> &ensp;"+o[0]+(o[1]?"":" &mdash; "+o[2])+"</div>"
@@ -3174,7 +3218,7 @@ const UI={
 };
 
 /* ============================================================
-   ART - Signal Studio (v0.4.0)
+   ART - Signal Studio (v0.5.0)
    Turns the live spectrum and raw IQ into generative paintings.
    Reads RX.specAvg (per-bin dB, DC-centered) and RX.iqRing.
    Non-destructive: the receiver, audio, and decoders run as before.
@@ -3229,6 +3273,7 @@ const ART = {
     this.camc=document.createElement("canvas"); this.camc.width=16; this.camc.height=16;
     this.camx=this.camc.getContext("2d");
     this.cam={on:false,stream:null,video:null,ready:false};
+    this.gallery=[];
     const a=Object.assign({engine:"aurora",palette:"aurora",intensity:1,trails:0.85,flow:1,symmetry:6,plate:true,mirror:true,facing:"user",backdrop:"none",blend:0.62}, S.art||{});
     this.engine=a.engine; this.palette=a.palette; this.intensity=a.intensity;
     this.trails=a.trails; this.flow=a.flow; this.symmetry=a.symmetry; this.plate=a.plate;
@@ -3275,6 +3320,10 @@ const ART = {
     const cf=$("camFlip"); if(cf) cf.onclick=()=>this.flipCam();
     const cm=$("camMirror"); if(cm) cm.onclick=()=>{ this.mirror=!this.mirror; this.save(); this.updateCamUI(); };
     const cb=$("camBackdrop"); if(cb) cb.onclick=()=>{ const o=this.BACKDROPS, i=(o.indexOf(this.backdrop)+1)%o.length; this.backdrop=o[i]; this.save(); this.updateCamUI(); this.clear(); };
+    const se=$("setExport"); if(se) se.onclick=()=>this.exportSettings();
+    const sib=$("setImportBtn"), sif=$("setImportFile");
+    if(sib&&sif){ sib.onclick=()=>sif.click(); sif.onchange=e=>{ this.importSettings(e.target.files&&e.target.files[0]); e.target.value=""; }; }
+    this.renderGallery();
     this.updateCamUI();
   },
   syncUI(){
@@ -3602,26 +3651,40 @@ const ART = {
 
   /* ---- clip recording (canvas capture to a webm file) ---- */
   recSupported(){ return !!(this.cv && this.cv.captureStream && typeof MediaRecorder!=="undefined"); },
+  audioTrackForRec(){
+    try{
+      if(typeof RX==="undefined"||!RX.actx||!RX.node) return null;
+      if(!RX.recDest){ RX.recDest=RX.actx.createMediaStreamDestination(); RX.node.connect(RX.recDest); }
+      if(RX.actx.state==="suspended"){ try{ RX.actx.resume(); }catch(e){} }
+      const at=RX.recDest.stream.getAudioTracks();
+      return at&&at.length?at[0]:null;
+    }catch(e){ return null; }
+  },
   startRec(){
     if(this.rec&&this.rec.on) return;
     if(!this.recSupported()){ this.rec={on:false,error:"Recording not supported here"}; this.updateRecUI(); return; }
-    let stream, recorder;
+    let vstream, stream, recorder, hasAudio=false;
     try{
-      stream=this.cv.captureStream(30);
-      const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];
+      vstream=this.cv.captureStream(30);
+      const at=this.audioTrackForRec();
+      if(at){ stream=new MediaStream([...vstream.getVideoTracks(), at]); hasAudio=true; }
+      else stream=vstream;
+      const types=hasAudio
+        ? ["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm;codecs=vp9","video/webm","video/mp4"]
+        : ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];
       let mime=""; for(const t of types){ if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)){ mime=t; break; } }
       recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream);
-      this.rec={on:true,recorder,stream,chunks:[],mime:recorder.mimeType||mime||"video/webm",t0:(performance&&performance.now)?performance.now():Date.now(),timer:null,error:null};
+      this.rec={on:true,recorder,vstream,chunks:[],mime:recorder.mimeType||mime||"video/webm",hasAudio,t0:(performance&&performance.now)?performance.now():Date.now(),timer:null,error:null};
       recorder.ondataavailable=e=>{ if(e.data&&e.data.size) this.rec.chunks.push(e.data); };
       recorder.onstop=()=>this.finishRec();
       recorder.start(120);
       this.rec.timer=setInterval(()=>{
         const s=(((performance&&performance.now)?performance.now():Date.now())-this.rec.t0)/1000;
-        const rt=$("artRecTime"); if(rt) rt.textContent=s<60?(s.toFixed(1)+"s"):(Math.floor(s/60)+"m"+String(Math.floor(s%60)).padStart(2,"0"));
+        const rt=$("artRecTime"); if(rt) rt.textContent=(s<60?(s.toFixed(1)+"s"):(Math.floor(s/60)+"m"+String(Math.floor(s%60)).padStart(2,"0")))+(this.rec.hasAudio?" \u266a":"");
         if(s>=this.MAXREC) this.stopRec();
       },200);
       this.updateRecUI();
-    }catch(err){ this.rec={on:false,error:"Recording failed to start"}; if(stream){ try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} } this.updateRecUI(); }
+    }catch(err){ this.rec={on:false,error:"Recording failed to start"}; if(vstream){ try{ vstream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} } this.updateRecUI(); }
   },
   stopRec(){
     const r=this.rec; if(!r||!r.on) return;
@@ -3630,17 +3693,16 @@ const ART = {
   },
   finishRec(){
     const r=this.rec; if(!r) return;
-    if(r.stream){ try{ r.stream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+    if(r.vstream){ try{ r.vstream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} }  /* audio tap stays connected for reuse */
     const chunks=r.chunks||[];
     r.on=false;
     if(chunks.length){
       const blob=new Blob(chunks,{type:r.mime||"video/webm"});
       const ext=(r.mime&&r.mime.indexOf("mp4")>=0)?"mp4":"webm";
-      const a=document.createElement("a");
-      a.href=URL.createObjectURL(blob);
-      a.download="kaleidophone-clip-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+"."+ext;
-      a.click();
-      setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(e){} },4000);
+      const url=URL.createObjectURL(blob), name="kaleidophone-clip-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+"."+ext;
+      const a=document.createElement("a"); a.href=url; a.download=name; a.click();
+      let poster=""; try{ poster=this.cv.toDataURL("image/png"); }catch(e){}
+      this.addToGallery({type:"clip",url,name,thumb:poster,ext,audio:r.hasAudio,ts:Date.now()});
     }
     this.updateRecUI();
   },
@@ -3673,10 +3735,71 @@ const ART = {
       o.fillStyle="#9a86c4";
       o.fillText(this.PALNAMES[this.palette]+" \u00b7 "+this.engine+" \u00b7 "+new Date().toISOString().slice(0,19).replace("T"," ")+"Z", px+12, py+51);
     }
-    const a=document.createElement("a");
-    a.href=out.toDataURL("image/png");
-    a.download="spectrum-art-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+".png";
-    a.click();
+    const url=out.toDataURL("image/png"), name="kaleidophone-art-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+".png";
+    const a=document.createElement("a"); a.href=url; a.download=name; a.click();
+    this.addToGallery({type:"png",url,name,thumb:url,ts:Date.now()});
+  },
+
+  /* ---- in-studio gallery of recent captures and clips (session) ---- */
+  GALLERY_MAX:12,
+  addToGallery(item){
+    if(!this.gallery) this.gallery=[];
+    this.gallery.unshift(item);
+    while(this.gallery.length>this.GALLERY_MAX){
+      const old=this.gallery.pop();
+      if(old&&old.type==="clip"&&old.url){ try{ URL.revokeObjectURL(old.url); }catch(e){} }
+    }
+    this.renderGallery();
+  },
+  renderGallery(){
+    const host=$("artGallery"); if(!host) return;
+    const g=this.gallery||[];
+    if(!g.length){ host.innerHTML="<div class='gal-empty'>Captures and clips you make will appear here. They live in this session.</div>"; return; }
+    host.innerHTML="";
+    g.forEach((it,i)=>{
+      const cell=document.createElement("div"); cell.className="gal-cell";
+      const im=document.createElement("img"); im.className="gal-thumb"; im.alt=(it.type==="clip"?"Clip":"Capture")+" thumbnail"; if(it.thumb) im.src=it.thumb; cell.appendChild(im);
+      const badge=document.createElement("span"); badge.className="gal-badge"; badge.textContent=(it.type==="clip")?("CLIP"+(it.audio?" \u266a":"")):"PNG"; cell.appendChild(badge);
+      const save=document.createElement("button"); save.className="gal-act"; save.title="Save again"; save.textContent="\u2193"; save.onclick=()=>this.gallerySave(i); cell.appendChild(save);
+      const del=document.createElement("button"); del.className="gal-act gal-del"; del.title="Remove"; del.textContent="\u00d7"; del.onclick=()=>this.galleryRemove(i); cell.appendChild(del);
+      if(it.type==="clip"){ im.style.cursor="pointer"; im.title="Open clip"; im.onclick=()=>{ try{ window.open(it.url,"_blank"); }catch(e){} }; }
+      host.appendChild(cell);
+    });
+  },
+  gallerySave(i){
+    const it=(this.gallery||[])[i]; if(!it) return;
+    const a=document.createElement("a"); a.href=it.url; a.download=it.name||("kaleidophone."+(it.ext||"png")); a.click();
+  },
+  galleryRemove(i){
+    const g=this.gallery||[], it=g[i]; if(!it) return;
+    if(it.type==="clip"&&it.url){ try{ URL.revokeObjectURL(it.url); }catch(e){} }
+    g.splice(i,1); this.renderGallery();
+  },
+
+  /* ---- settings export / import (portable JSON) ---- */
+  exportSettings(){
+    let json="{}"; try{ json=JSON.stringify(S,null,2); }catch(e){ return; }
+    const blob=new Blob([json],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="kaleidophone-settings-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19)+".json"; a.click();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(e){} },4000);
+    const st=$("setStatus"); if(st) st.textContent="Settings exported.";
+  },
+  importSettings(file){
+    const st=$("setStatus");
+    if(!file){ if(st) st.textContent="No file chosen."; return; }
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        const obj=JSON.parse(rd.result);
+        if(!obj||typeof obj!=="object"||Array.isArray(obj)) throw new Error("not a settings object");
+        Object.assign(S, obj); Store.save();
+        if(st) st.textContent="Settings imported. Reloading.";
+        setTimeout(()=>{ try{ location.reload(); }catch(e){} },500);
+      }catch(err){ if(st) st.textContent="That file is not valid KALEIDOPHONE settings."; }
+    };
+    rd.onerror=()=>{ if(st) st.textContent="Could not read that file."; };
+    rd.readAsText(file);
   }
 };
 
